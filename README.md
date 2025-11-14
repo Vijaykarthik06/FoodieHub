@@ -1,2 +1,0 @@
-# FoodieHub
-# FoodieHub-frontend

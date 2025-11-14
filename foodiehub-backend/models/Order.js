@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
-const orderItemSchema = mongoose.Schema({
-  product: {
+const orderItemSchema = new mongoose.Schema({
+  menuItem: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
+    ref: 'MenuItem',
     required: true
   },
   name: {
@@ -21,121 +21,166 @@ const orderItemSchema = mongoose.Schema({
     min: 1,
     default: 1
   },
-  specialInstructions: {
-    type: String,
-    maxlength: 200
-  }
+  image: String,
+  specialInstructions: String,
+  customizations: [{
+    name: String,
+    option: String,
+    price: Number
+  }]
 });
 
-const orderSchema = mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    restaurant: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Restaurant',
-      required: true
-    },
-    items: [orderItemSchema],
-    subtotal: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    tax: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    deliveryFee: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    total: {
-      type: Number,
-      required: true,
-      min: 0
-    },
-    deliveryAddress: {
-      street: {
-        type: String,
-        required: true
-      },
-      city: {
-        type: String,
-        required: true
-      },
-      state: {
-        type: String,
-        required: true
-      },
-      zipCode: {
-        type: String,
-        required: true
-      },
-      country: {
-        type: String,
-        default: 'United States'
-      },
-      instructions: String
-    },
-    contactInfo: {
-      name: {
-        type: String,
-        required: true
-      },
-      phone: {
-        type: String,
-        required: true
-      },
-      email: {
-        type: String,
-        required: true
-      }
-    },
-    paymentMethod: {
-      type: String,
-      enum: ['credit_card', 'debit_card', 'paypal', 'cash'],
-      required: true
-    },
-    paymentStatus: {
-      type: String,
-      enum: ['pending', 'completed', 'failed', 'refunded'],
-      default: 'pending'
-    },
-    paymentId: String, // For payment gateway reference
-    orderStatus: {
-      type: String,
-      enum: ['pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'cancelled'],
-      default: 'pending'
-    },
-    estimatedDelivery: Date,
-    deliveredAt: Date,
-    cancelledAt: Date,
-    cancellationReason: String,
-    driver: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    rating: {
-      type: Number,
-      min: 1,
-      max: 5
-    },
-    review: String
+const orderSchema = new mongoose.Schema({
+  orderNumber: {
+    type: String,
+    unique: true,
+    required: true
   },
-  {
-    timestamps: true,
-  }
-);
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  restaurant: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Restaurant',
+    required: true
+  },
+  items: [orderItemSchema],
+  status: {
+    type: String,
+    enum: [
+      'pending',
+      'confirmed',
+      'preparing',
+      'ready',
+      'out_for_delivery',
+      'delivered',
+      'cancelled',
+      'refunded'
+    ],
+    default: 'pending'
+  },
+  deliveryAddress: {
+    street: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    area: String,
+    instructions: String
+  },
+  contactInfo: {
+    name: String,
+    phone: String,
+    email: String
+  },
+  deliveryType: {
+    type: String,
+    enum: ['delivery', 'pickup'],
+    default: 'delivery'
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['credit_card', 'debit_card', 'paypal', 'cash_on_delivery'],
+    required: true
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'completed', 'failed', 'refunded'],
+    default: 'pending'
+  },
+  subtotal: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  deliveryFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tax: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  serviceFee: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  tip: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  discountAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  totalAmount: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  estimatedDelivery: Date,
+  deliveredAt: Date,
+  cancelledAt: Date,
+  cancellationReason: String,
+  rated: {
+    type: Boolean,
+    default: false
+  },
+  rating: {
+    type: Number,
+    min: 1,
+    max: 5
+  },
+  review: String
+}, {
+  timestamps: true
+});
 
-// Create index for better query performance
-orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ restaurant: 1, createdAt: -1 });
-orderSchema.index({ orderStatus: 1 });
+// Generate order number before saving
+orderSchema.pre('save', async function(next) {
+  if (this.isNew) {
+    const date = new Date();
+    const timestamp = date.getTime();
+    const random = Math.floor(Math.random() * 1000);
+    this.orderNumber = `ORD${timestamp}${random}`;
+  }
+  next();
+});
+
+// Calculate total before saving
+orderSchema.pre('save', function(next) {
+  if (this.isModified('items') || this.isModified('deliveryFee') || 
+      this.isModified('tax') || this.isModified('serviceFee') || 
+      this.isModified('tip') || this.isModified('discountAmount')) {
+    
+    const itemsTotal = this.items.reduce((total, item) => {
+      return total + (item.price * item.quantity);
+    }, 0);
+    
+    this.subtotal = itemsTotal;
+    this.totalAmount = itemsTotal + this.deliveryFee + this.tax + this.serviceFee + this.tip - this.discountAmount;
+  }
+  next();
+});
+
+// Update status timestamps
+orderSchema.pre('save', function(next) {
+  if (this.isModified('status')) {
+    const now = new Date();
+    
+    if (this.status === 'delivered' && !this.deliveredAt) {
+      this.deliveredAt = now;
+    } else if (this.status === 'cancelled' && !this.cancelledAt) {
+      this.cancelledAt = now;
+    }
+  }
+  next();
+});
 
 module.exports = mongoose.model('Order', orderSchema);
