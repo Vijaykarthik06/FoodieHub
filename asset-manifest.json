@@ -1,12 +1,12 @@
 {
   "files": {
     "main.css": "/FoodieHub/static/css/main.c87b1956.css",
-    "main.js": "/FoodieHub/static/js/main.e30e5027.js",
+    "main.js": "/FoodieHub/static/js/main.27cf7740.js",
     "static/media/hero-image.png": "/FoodieHub/static/media/hero-image.afed72e1fd8b34c41f80.png",
     "index.html": "/FoodieHub/index.html"
   },
   "entrypoints": [
     "static/css/main.c87b1956.css",
-    "static/js/main.e30e5027.js"
+    "static/js/main.27cf7740.js"
   ]
 }
